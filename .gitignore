@@ -1,0 +1,8 @@
+__pycache__/
+.ipynb_checkpoints/
+.DS_Store
+*.env
+test/
+tesy.py
+test_ddpm.py
+test_ddim.py
