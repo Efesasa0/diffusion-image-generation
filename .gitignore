@@ -6,3 +6,5 @@ test/
 tesy.py
 test_ddpm.py
 test_ddim.py
+notes.txt
+ignore_me
