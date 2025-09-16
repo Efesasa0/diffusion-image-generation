@@ -7,7 +7,7 @@ Below can be seen a sampel from the training data and generated images from DDPM
 <table>
     <tr>
         <td style="text-align: center;" colspan="2">
-            <img src="assets/diffusion_figure.png" alt="figure" width="250">
+            <img src="assets/diffusion_figure.png" alt="figure" width="550">
             <p>Example generated images</p>
         </td>
     </tr>
