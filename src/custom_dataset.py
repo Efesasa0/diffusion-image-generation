@@ -5,8 +5,8 @@ import torchvision.transforms as transforms
 
 class SpritesDataset(Dataset):
     def __init__(self, images_path, labels_path, transform, null_context):
-        self.images = np.load(images_path, allow_pickle=True)
-        self.labels = np.load(labels_path, allow_pickle=True)
+        self.images = np.load(images_path, allow_pickle=False)
+        self.labels = np.load(labels_path, allow_pickle=False)
 
         self.images_shape = self.images.shape
         self.labels_shape = self.labels.shape

@@ -75,7 +75,7 @@ def train_generate(save_dir_weights,
 
     # TRAIN 
     def perturb_input(x, t, noise):
-        return alphas_hat.sqrt()[t, None, None, None]*x + (1-alphas_hat[t, None, None, None])*noise
+        return alphas_hat.sqrt()[t, None, None, None] * x + (1 - alphas_hat[t, None, None, None]).sqrt() * noise
     losses_save = []
     for epoch in range(epochs):
         optim.param_groups[0]['lr'] = lr*(1-epoch/epochs)
