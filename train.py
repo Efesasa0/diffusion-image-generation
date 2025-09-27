@@ -1,6 +1,5 @@
 import argparse
 import os
-from tqdm import tqdm
 from src import *
 import torch
 import torch.nn.functional as F
@@ -25,92 +24,71 @@ def main():
     parser.add_argument("--dataset_name", type=str, default="sprites", help="Dataset name to train on")
 
     args = parser.parse_args()
-    train_generate(args.save_dir_weights,
-                   args.save_periods,
-                   args.inference_outs_dir,
-                   args.inference,
-                   args.batch_size,
-                   args.epochs,
-                   args.lr,
-                   args.features,
-                   args.T,
-                   args.beta_start,
-                   args.beta_end,
-                   args.dataset_name,)
+    
+    train_generate(args)
 
-def train_generate(save_dir_weights,
-                   save_periods,
-                   inference_outs_dir,
-                   inference,
-                   batch_size,
-                   epochs,
-                   lr,
-                   features,
-                   T,
-                   beta_start,
-                   beta_end,
-                   dataset_name,):
+def train_generate(args):
 
     torch.manual_seed(42)
     device = "cuda" if torch.cuda.is_available() else 'cpu'
 
-    betas = (beta_end - beta_start) * torch.linspace(0, 1, T+1, device=device) + beta_start
+    betas = (args.beta_end - args.beta_start) * torch.linspace(0, 1, args.T+1, device=device) + args.beta_start
     alphas = 1 - betas
     alphas_hat = torch.cumsum(alphas.log(), dim=0).exp() # numerical stability trick
     alphas_hat[0] = 1
 
 
     # DATASET
-    if dataset_name == 'sprites':
+    if args.dataset_name == 'sprites':
         context_features = 5
         image_size = (16, 16)
         dataset = SpritesDataset("data/sprites/sprites_1788_16x16.npy",
                                 "data/sprites/sprite_labels_nc_1788_16x16.npy",
                                 sprites_transform,
                                 null_context=False)
-        model = ContextUnet(in_channels=3, features=features, context_features=context_features, image_size=image_size).to(device)
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=1) if device=='cuda' else DataLoader(dataset, batch_size, shuffle=True)
-    optim = torch.optim.Adam(model.parameters(), lr=lr)
+        model = ContextUnet(in_channels=3, features=args.features, context_features=context_features, image_size=image_size).to(device)
+    dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=1) if device=='cuda' else DataLoader(dataset, args.batch_size, shuffle=True)
+    optim = torch.optim.Adam(model.parameters(), lr=args.lr)
     model.train()
 
     # TRAIN 
     def perturb_input(x, t, noise):
         return alphas_hat.sqrt()[t, None, None, None] * x + (1 - alphas_hat[t, None, None, None]).sqrt() * noise
+    
     losses_save = []
-    for epoch in range(epochs):
-        optim.param_groups[0]['lr'] = lr*(1-epoch/epochs)
+    for epoch in range(args.epochs):
+        optim.param_groups[0]['lr'] = args.lr*(1-epoch/args.epochs)
 
-        losses = 0
+        batch_losses = []
         for x, c in dataloader:
             optim.zero_grad()
             x = x.to(device)
-            c = c.to(device)
+            c = c.float().to(device)
 
             context_mask = torch.bernoulli(torch.zeros(c.shape[0]) + 0.9).to(device)
             c = c * context_mask.unsqueeze(-1)
 
             noise = torch.randn_like(x)
-            t = torch.randint(1, T+1, (x.shape[0],)).to(device)
+            t = torch.randint(1, args.T+1, (x.shape[0],)).to(device)
             x_pert = perturb_input(x, t, noise)
             
-            pred_noise = model(x_pert, t/T, c)
-
+            pred_noise = model(x_pert, t/args.T, c)
             loss = F.mse_loss(pred_noise, noise)
-            losses += (loss.item())
+            batch_losses.append(loss.item())
             loss.backward()
-
             optim.step()
-        print(f'epoch: {epoch} - loss: {np.mean(losses)}')
-        losses_save.append(np.mean(losses))
+        
+        epoch_loss = float(np.mean(batch_losses))
+        print(f"epoch: {epoch} - loss: {epoch_loss:.4f}")
+        losses_save.append(epoch_loss)
         
         # save model periodically
-    if save_dir_weights:
-        if epoch%save_periods==0 or epoch==int(epochs-1):
-            if not os.path.exists(save_dir_weights):
-                os.mkdir(save_dir_weights)
-            torch.save(model.state_dict(), save_dir_weights + f"model_{epoch}.pth")
-            print('saved model at ' + save_dir_weights + f"model_{epoch}.pth")
-    print('saved model at ' + save_dir_weights + f"model_{epoch}.pth")
+        if args.save_dir_weights:
+            if epoch % args.save_periods == 0 or epoch == args.epochs - 1:
+                os.makedirs(args.save_dir_weights, exist_ok=True)
+                save_path = os.path.join(args.save_dir_weights, f"model_{epoch}.pth")
+                torch.save(model.state_dict(), save_path)
+                print(f"saved model at {save_path}")
 
     def denoise_add_noise(x, t, pred_noise, z=None):
         if z is None:
@@ -118,22 +96,20 @@ def train_generate(save_dir_weights,
         noise = betas.sqrt()[t] * z
         mean = (x - pred_noise * ((1 - alphas[t]) / (1 - alphas_hat[t]).sqrt())) / alphas[t].sqrt()
         return mean + noise
+
     @torch.no_grad()
     def sample_ddpm(n_sample, context ,save_rate=20):
         samples = torch.randn(n_sample, 3, image_size[0], image_size[1]).to(device)
-
         intermediate = []
-        for i in range(T, 0, -1):
+        for i in range(args.T, 0, -1):
             print(f'sampling timestep {i:3d}', end='\r')
-            t = torch.tensor([i / T])[:, None, None, None].to(device)
+            t = torch.tensor([i / args.T])[:, None, None, None].to(device)
             z = torch.randn_like(samples) if i > 1 else 0
             eps = model(samples, t, c=context)
             samples = denoise_add_noise(samples, i, eps, z)
-            if i % save_rate ==0 or i==T or i<8:
+            if i % save_rate ==0 or i==args.T or i<8:
                 intermediate.append(samples.detach().cpu().numpy())
-            
-        intermediate = np.stack(intermediate)
-        return samples, intermediate
+        return samples, np.stack(intermediate)
 
     def denoise_ddim(x, t, t_prev, pred_noise):
         ab = alphas_hat[t]
@@ -142,26 +118,23 @@ def train_generate(save_dir_weights,
         x0_pred = ab_prev.sqrt() / ab.sqrt() * (x - (1 - ab).sqrt() * pred_noise)
         dir_xt = (1 - ab_prev).sqrt() * pred_noise
         return x0_pred + dir_xt
+
     @torch.no_grad()
     def sample_ddim(n_sample, context ,n=20):
         samples = torch.randn(n_sample, 3, image_size[0], image_size[1]).to(device)
-
         intermediate = []
-        step_size = T // n
-        for i in range(T, 0, -step_size):
+        step_size = args.T // n
+        for i in range(args.T, 0, -step_size):
             print(f'sampling timestep {i:3d}', end='\r')
-
-            t = torch.tensor([i / T])[:, None, None, None].to(device)
+            t = torch.tensor([i / args.T])[:, None, None, None].to(device)
             eps = model(samples, t, c=context)
             samples = denoise_ddim(samples, i, i-step_size, eps)
             intermediate.append(samples.detach().cpu().numpy())
-            
         intermediate = np.stack(intermediate)
         return samples, intermediate
 
-    if inference_outs_dir:
-
-        model.load_state_dict(torch.load(f"{save_dir_weights}/model_{str(epoch)}.pth", map_location=device))
+    if args.inference_outs_dir:
+        model.load_state_dict(torch.load(f"{args.save_dir_weights}/model_{str(epoch)}.pth", map_location=device))
         model.eval()
         print("Loaded in Model")
 
@@ -179,20 +152,20 @@ def train_generate(save_dir_weights,
         ]).float().to(device)
 
         import time
-        if inference=="ddpm":
+        if args.inference=="ddpm":
             start = time.time()
             samples, _ = sample_ddpm(ctx.shape[0], ctx)
             speed = time.time()-start
             print(f'DDPM: generated outputs. taken {speed} time')
-            torch.save(samples, f'{inference_outs_dir}ddpm_file.pt')
-            torch.save(torch.tensor(losses_save), f'{inference_outs_dir}ddpm_loss.pt')
-        if inference=="ddim":
+            torch.save(samples, f'{args.inference_outs_dir}ddpm_file.pt')
+            torch.save(torch.tensor(losses_save), f'{args.inference_outs_dir}ddpm_loss.pt')
+        if args.inference=="ddim":
             start = time.time()
             samples, _ = sample_ddim(ctx.shape[0], context=ctx, n=25)
             speed = time.time()-start
             print(f'DDIM: generated outputs. taken {speed} time')
-            torch.save(samples, f'{inference_outs_dir}ddim_file.pt')
-            torch.save(torch.tensor(losses_save), f'{inference_outs_dir}ddim_loss.pt')
+            torch.save(samples, f'{args.inference_outs_dir}ddim_file.pt')
+            torch.save(torch.tensor(losses_save), f'{args.inference_outs_dir}ddim_loss.pt')
 
 if __name__=="__main__":
     main()
