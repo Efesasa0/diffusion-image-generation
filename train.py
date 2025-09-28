@@ -52,7 +52,9 @@ def train_generate(args):
         context_features = 10
         image_size = (32, 32)
         transform = transforms.Compose([
+            transforms.Resize((16, 16)),
             transforms.ToTensor(),
+            transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5))
         ])
         dataset = datasets.CIFAR10(
             root="data/cifar10/",
