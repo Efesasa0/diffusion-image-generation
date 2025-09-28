@@ -1,5 +1,6 @@
 from src.model_parts import ResidualDoubleConv, UpSample, DownSample, EmbedFC
 import torch.nn as nn
+import torch.nn.functional as F
 import torch
 
 class ContextUnet(nn.Module):
@@ -61,6 +62,8 @@ class ContextUnet(nn.Module):
         up1 = self.up0(hiddenvec)
         up2 = self.up1(cemb1*up1 + temb1, down2)
         up3 = self.up2(cemb2*up2 + temb2, down1)
+        if up3.shape[2:] != x.shape[2:]:
+            x = F.interpolate(x, size=up3.shape[2:], mode="nearest")
         out = self.out(torch.cat((up3, x), 1))
         return out
 
