@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 class ResidualDoubleConv(nn.Module):
     def __init__(self, in_channels, out_channels, is_residual=False):
@@ -48,7 +49,8 @@ class UpSample(nn.Module):
         )
     
     def forward(self, x, skip):
-
+        if x.shape[2:] != skip.shape[2:]:
+            skip = F.interpolate(skip, size=x.shape[2:], mode="nearest")
         x = torch.cat((x, skip), 1)
         x = self.conv(x)
 
