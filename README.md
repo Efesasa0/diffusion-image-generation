@@ -1,5 +1,9 @@
 # DDPM From Scratch
 
+Try generating sprites on HF :)
+
+[![Hugging Face Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20HuggingFace-Spaces-blue)](https://huggingface.co/spaces/Efesasa0/Sprite-Generation)
+
 Implementation of the Image Generation, Diffusion model adapted from the [paper](https://arxiv.org/abs/2006.11239). To test the capability to the most simple case, the model has been trained on the custom "Sprites" dataset from the [DeepLearning.ai](https://www.deeplearning.ai/short-courses/how-diffusion-models-work/) course.
 
 Below can be seen a sampel from the training data and generated images from DDPM and DDIM generation algorithms. For more specific detail read the relative [notebook results](notebooks/1_visualize_sprites.ipynb) trained on 100 epochs with lr=3e-4. For effective training, please use a GPU.

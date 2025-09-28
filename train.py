@@ -89,6 +89,8 @@ def train_generate(args):
                 save_path = os.path.join(args.save_dir_weights, f"model_{epoch}.pth")
                 torch.save(model.state_dict(), save_path)
                 print(f"saved model at {save_path}")
+    torch.save(model.state_dict(), save_path)
+    print(f"saved model at {save_path}")
 
     def denoise_add_noise(x, t, pred_noise, z=None):
         if z is None:
