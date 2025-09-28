@@ -1,16 +1,1 @@
 *.npy filter=lfs diff=lfs merge=lfs -text
-train.py filter=lfs diff=lfs merge=lfs -text
-assets filter=lfs diff=lfs merge=lfs -text
-data filter=lfs diff=lfs merge=lfs -text
-outs filter=lfs diff=lfs merge=lfs -text
-README.md filter=lfs diff=lfs merge=lfs -text
-requirements.txt filter=lfs diff=lfs merge=lfs -text
-__pycache__ filter=lfs diff=lfs merge=lfs -text
-notebooks filter=lfs diff=lfs merge=lfs -text
-test_ddim.py filter=lfs diff=lfs merge=lfs -text
-test_ddpm.py filter=lfs diff=lfs merge=lfs -text
-notes.txt filter=lfs diff=lfs merge=lfs -text
-src filter=lfs diff=lfs merge=lfs -text
-test filter=lfs diff=lfs merge=lfs -text
-weights filter=lfs diff=lfs merge=lfs -text
-tesy.py filter=lfs diff=lfs merge=lfs -text
